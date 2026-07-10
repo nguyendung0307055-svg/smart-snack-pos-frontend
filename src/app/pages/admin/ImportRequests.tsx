@@ -19,6 +19,7 @@ interface ImportRequest {
 }
 
 export function ImportRequests() {
+    const user = JSON.parse(localStorage.getItem("user") || "{}");
     const [requests, setRequests] = useState<ImportRequest[]>([]);
     const [loading, setLoading] = useState(true);
 
@@ -183,56 +184,45 @@ export function ImportRequests() {
                                         <TableCell><Badge variant="outline">{req.requestedBy}</Badge></TableCell>
                                         <TableCell>{getStatusBadge(req.status)}</TableCell>
                                         <TableCell className="text-right">
-                                            {req.status === "PENDING" ? (
+                                            {/* CHỈ ADMIN MỚI ĐƯỢC PHÉP THAO TÁC DUYỆT / TỪ CHỐI / NHẬP KHO */}
+                                            {user.role === "ADMIN" ? (
+                                                req.status === "PENDING" ? (
+                                                    <div className="flex justify-end gap-2">
+                                                        <Button
+                                                            size="sm"
+                                                            className="bg-green-600 hover:bg-green-700"
+                                                            onClick={() => handleApprove(req)}
+                                                        >
+                                                            <Check className="w-4 h-4 mr-1" />
+                                                            Duyệt
+                                                        </Button>
 
-                                                <div className="flex justify-end gap-2">
-
+                                                        <Button
+                                                            size="sm"
+                                                            variant="outline"
+                                                            className="text-red-600 border-red-200"
+                                                            onClick={() => handleReject(req.id)}
+                                                        >
+                                                            <X className="w-4 h-4 mr-1" />
+                                                            Từ chối
+                                                        </Button>
+                                                    </div>
+                                                ) : req.status === "APPROVED" ? (
                                                     <Button
                                                         size="sm"
-                                                        className="bg-green-600 hover:bg-green-700"
-                                                        onClick={() =>
-                                                            handleApprove(req)
-                                                        }
+                                                        className="bg-blue-600 hover:bg-blue-700"
+                                                        onClick={() => handleReceiveImport(req)}
                                                     >
-                                                        <Check className="w-4 h-4 mr-1" />
-                                                        Duyệt
+                                                        Nhập kho
                                                     </Button>
-
-                                                    <Button
-                                                        size="sm"
-                                                        variant="outline"
-                                                        className="text-red-600 border-red-200"
-                                                        onClick={() =>
-                                                            handleReject(req.id)
-                                                        }
-                                                    >
-                                                        <X className="w-4 h-4 mr-1" />
-                                                        Từ chối
-                                                    </Button>
-
-                                                </div>
-
-                                            ) : req.status === "APPROVED" ? (
-
-                                                <Button
-                                                    size="sm"
-                                                    className="bg-blue-600 hover:bg-blue-700"
-                                                    onClick={() =>
-                                                        handleReceiveImport(req)
-                                                    }
-                                                >
-                                                    Nhập kho
-                                                </Button>
-
+                                                ) : (
+                                                    <span className="text-xs text-gray-400 italic">Đã xử lý</span>
+                                                )
                                             ) : (
-
-                                                <span className="text-xs text-gray-400 italic">
-                                                    Đã xử lý
-                                                </span>
-
+                                                /* NẾU LÀ KITCHEN HOẶC ROLE KHÁC: Chỉ hiển thị dòng chữ thông báo xem, không cho bấm */
+                                                <span className="text-xs text-gray-400 italic">Chỉ xem</span>
                                             )}
-                                        </TableCell>
-                                    </TableRow>
+                                        </TableCell>                                    </TableRow>
                                 ))
                             )}
                         </TableBody>

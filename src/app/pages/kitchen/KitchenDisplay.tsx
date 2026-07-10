@@ -28,6 +28,8 @@ import {
   LogOut,
   Loader2,
   LogIn,
+  AlertTriangle,
+  PlusCircle,
   Clock as ClockIcon
 } from 'lucide-react';
 
@@ -40,7 +42,7 @@ import { notificationSound } from '../../utils/notificationSound';
 
 import orderService from '../../../services/orderService';
 import ingredientService from '../../../services/ingredientService';
-import scheduleService from '../../../services/scheduleService'; 
+import scheduleService from '../../../services/scheduleService';
 
 export function KitchenDisplay() {
   const navigate = useNavigate();
@@ -127,10 +129,10 @@ export function KitchenDisplay() {
         if (userObj?.role === 'ADMIN' || userObj?.role === 'OWNER') {
           setIsCheckedIn(true);
           await Promise.all([fetchOrders(), fetchIngredients()]);
-          return; // Dừng check lịch trực ở đây cho Admin
+          return;
         }
 
-        // ĐỐI VỚI NHÂN VIÊN BẾP THƯỜNG: Vẫn kiểm tra lịch trực và đồng bộ chấm công cũ
+        // ĐỐI VỚI NHÂN VIÊN BẾP THƯỜNG: Kiểm tra lịch trực và đồng bộ chấm công cũ
         const scheduleData = await scheduleService.getMyScheduleToday();
         
         if (scheduleData && scheduleData.id) {
@@ -201,7 +203,6 @@ export function KitchenDisplay() {
   };
 
   const handleCheckOutConfirm = async () => {
-    // Nếu Admin nhấn checkout, chỉ cần tắt màn hình làm việc hoặc xóa trạng thái tạm thời
     if (currentUser?.role === 'ADMIN' || currentUser?.role === 'OWNER') {
       setIsCheckedOut(true);
       toast.success("Admin đã đóng phiên làm việc của bếp!");
@@ -219,6 +220,11 @@ export function KitchenDisplay() {
     } finally {
       setShowConfirmCheckOut(false);
     }
+  };
+
+  const handleSendImportRequest = () => {
+    toast.info("Đang chuyển hướng đến trang gửi yêu cầu nhập hàng...");
+    navigate("/admin/import-requests");
   };
 
   const updateOrderStatus = async (orderId: number, newStatus: 'COOKING' | 'DONE') => {
@@ -335,7 +341,7 @@ export function KitchenDisplay() {
         </div>
 
         <div className="flex items-center gap-3">
-          {/* Chỉ hiển thị cụm nút chấm công nếu KHÔNG PHẢI là Admin */}
+          {/* Cụm nút chấm công cho nhân viên bếp thường */}
           {!isAdminOrOwner && (
             <>
               <Button
@@ -360,7 +366,7 @@ export function KitchenDisplay() {
             </>
           )}
 
-          {/* Nếu là Admin thì có nút đóng phiên chế biến nhanh */}
+          {/* Nút đóng phiên chế biến nhanh dành cho Admin/Owner */}
           {isAdminOrOwner && !isCheckedOut && (
             <Button
               variant="outline"
@@ -382,159 +388,214 @@ export function KitchenDisplay() {
         </div>
       </header>
 
-      {/* THÂN MÀN HÌNH CHẶN QUYỀN TRUY CẬP THEO TRẠNG THÁI CA LÀM */}
+      {/* THÂN MÀN HÌNH CHÍNH */}
       <div className="p-6">
-        {!isCheckedIn ? (
-          <div className="text-center py-24 bg-white border-2 border-dashed rounded-3xl max-w-2xl mx-auto p-8 shadow-sm">
-            <Clock className="w-16 h-16 mx-auto text-amber-500 mb-4 animate-bounce" />
-            <h2 className="text-2xl font-black text-gray-800">Bạn chưa vào ca trực bếp!</h2>
-            <p className="text-gray-500 mt-2 mb-6">Vui lòng nhấn nút <b>"Nhận Ca Bếp (Check In)"</b> ở góc trên bên phải màn hình để bắt đầu theo dõi và nhận danh sách món cần làm.</p>
-            <Button size="lg" className="bg-emerald-600 hover:bg-emerald-700 font-bold shadow-md rounded-xl" onClick={handleCheckInClick} disabled={!todaySchedule}>
-              Vào ca ngay lúc này
+        
+        {/* BANNER THÔNG BÁO THIẾU NGUYÊN LIỆU */}
+        {lowStockIngredients.length > 0 && (
+          <div className="mb-6 p-4 bg-red-50 border-2 border-red-200 rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shadow-sm">
+            <div className="flex flex-col gap-1 flex-1">
+              <p className="text-red-700 font-black flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5 text-red-600" />
+                CẢNH BÁO KHO BẾP SẮP HẾT NGUYÊN LIỆU:
+              </p>
+              <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1">
+                {lowStockIngredients.map((item: any) => (
+                  <span key={item.id} className="text-sm text-red-600 font-bold">
+                    • {item.name} (Còn tồn: {item.stockQuantity})
+                  </span>
+                ))}
+              </div>
+            </div>
+            <Button 
+              onClick={handleSendImportRequest}
+              className="bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl shadow-md whitespace-nowrap flex items-center gap-1.5"
+            >
+              <PlusCircle className="w-4 h-4" />
+              Yêu cầu nhập nguyên liệu
             </Button>
           </div>
+        )}
+
+        {/* THỐNG KÊ SỐ LƯỢNG ĐƠN */}
+        <div className="grid grid-cols-3 gap-4 mb-6">
+          <Card>
+            <CardContent className="p-4 text-center">
+              <Clock className="w-6 h-6 mx-auto text-yellow-500 mb-2" />
+              <p className="text-sm text-gray-500">Chờ xử lý</p>
+              <p className="text-3xl font-bold text-yellow-600">{pendingOrders.length}</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-4 text-center">
+              <ChefHat className="w-6 h-6 mx-auto text-blue-500 mb-2" />
+              <p className="text-sm text-gray-500">Đang nấu</p>
+              <p className="text-3xl font-bold text-blue-600">{cookingOrders.length}</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-4 text-center">
+              <CheckCircle className="w-6 h-6 mx-auto text-green-500 mb-2" />
+              <p className="text-sm text-gray-500">Tổng hoàn thành</p>
+              <p className="text-3xl font-bold text-green-600">{totalDoneOrders.length}</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* ĐIỀU KIỆN HIỂN THỊ: PHẢI CHECK IN MỚI THẤY ĐƠN HÀNG */}
+        {!isCheckedIn ? (
+          <div className="text-center py-20 bg-white border rounded-2xl shadow-sm">
+            <ChefHat className="w-16 h-16 mx-auto text-gray-300 mb-4" />
+            <h3 className="text-xl font-bold text-gray-700">Bạn chưa vào ca làm việc</h3>
+            <p className="text-gray-400 mt-1 mb-4">Vui lòng nhấn nút "Nhận Ca Bếp (Check In)" phía trên để bắt đầu theo dõi và chế biến món ăn.</p>
+          </div>
         ) : isCheckedOut ? (
-          <div className="text-center py-24 bg-gray-100 border rounded-3xl max-w-2xl mx-auto p-8">
-            <CheckCircle className="w-16 h-16 mx-auto text-gray-400 mb-4" />
-            <h2 className="text-2xl font-black text-gray-500">{isAdminOrOwner ? "Màn hình bếp đã tạm đóng" : "Bạn đã hoàn thành ca trực hôm nay"}</h2>
-            <p className="text-gray-400 mt-2">{isAdminOrOwner ? "Bạn có thể tải lại trang để tiếp tục quản lý." : "Dữ liệu chấm công ca bếp đã được chốt và đồng bộ về hệ thống tính lương."}</p>
-            {isAdminOrOwner && (
-              <Button className="mt-4 bg-blue-600 hover:bg-blue-700 rounded-xl font-bold" onClick={() => window.location.reload()}>Mở lại màn hình bếp</Button>
-            )}
+          <div className="text-center py-20 bg-white border rounded-2xl shadow-sm">
+            <CheckCircle className="w-16 h-16 mx-auto text-emerald-500 mb-4" />
+            <h3 className="text-xl font-bold text-gray-700">Đã hoàn thành phiên làm việc</h3>
+            <p className="text-gray-400 mt-1">Cảm ơn bạn! Hẹn gặp lại vào ca làm việc tiếp theo.</p>
           </div>
         ) : (
-          <>
-            {/* THÔNG BÁO THIẾU NGUYÊN LIỆU NẾU CÓ */}
-            {lowStockIngredients.length > 0 && (
-              <div className="mb-6 p-4 bg-red-50 border-2 border-red-200 rounded-2xl flex flex-col gap-1">
-                <p className="text-red-700 font-black flex items-center gap-2">⚠ CẢNH BÁO KHO BẾP SẮP HẾT NGUYÊN LIỆU:</p>
-                <div className="flex flex-wrap gap-x-4 gap-y-1">
-                  {lowStockIngredients.map((item: any) => (
-                    <span key={item.id} className="text-sm text-red-600 font-medium">• {item.name} (Tồn: {item.stockQuantity})</span>
-                  ))}
-                </div>
+          /* BA CỘT TRẠNG THÁI ĐƠN HÀNG */
+          <div className="grid lg:grid-cols-3 gap-6">
+            {/* CỘT 1: PENDING */}
+            <div>
+              <div className="flex items-center gap-2 mb-4">
+                <Clock className="w-5 h-5 text-yellow-600" />
+                <h2 className="text-xl font-bold">Chờ xử lý ({pendingOrders.length})</h2>
               </div>
-            )}
-
-            {/* THỐNG KÊ (3 CARD TỔNG HỢP CA LÀM) */}
-            <div className="grid grid-cols-3 gap-4 mb-6">
-              <Card><CardContent className="p-4 text-center"><Clock className="w-6 h-6 mx-auto text-yellow-500 mb-2" /><p className="text-sm text-gray-500">Chờ xử lý</p><p className="text-3xl font-bold text-yellow-600">{pendingOrders.length}</p></CardContent></Card>
-              <Card><CardContent className="p-4 text-center"><ChefHat className="w-6 h-6 mx-auto text-blue-500 mb-2" /><p className="text-sm text-gray-500">Đang nấu</p><p className="text-3xl font-bold text-blue-600">{cookingOrders.length}</p></CardContent></Card>
-              <Card><CardContent className="p-4 text-center"><CheckCircle className="w-6 h-6 mx-auto text-green-500 mb-2" /><p className="text-sm text-gray-500">Tổng hoàn thành (Trong ngày)</p><p className="text-3xl font-bold text-green-600">{totalDoneOrders.length}</p></CardContent></Card>
-            </div>
-
-            {/* BA CỘT TRẠNG THÁI QUẢN LÝ ĐƠN HÀNG */}
-            <div className="grid lg:grid-cols-3 gap-6">
-              {/* CỘT 1: PENDING */}
-              <div>
-                <div className="flex items-center gap-2 mb-4">
-                  <Clock className="w-5 h-5 text-yellow-600" />
-                  <h2 className="text-xl font-bold">Chờ xử lý ({pendingOrders.length})</h2>
-                </div>
-                <div className="space-y-4">
-                  {pendingOrders.map((order) => {
-                    const minutesWaiting = getWaitTimeMinutes(order.createdAt);
-                    const isOverdue = minutesWaiting > 15;
-                    return (
-                      <Card key={order.id} className={`border-2 ${getStatusColor(order.status)} ${isOverdue ? "ring-2 ring-red-500 animate-pulse" : ""}`}>
-                        <CardHeader>
-                          <div className="flex items-center justify-between">
-                            <div><CardTitle className="text-lg">{order.orderNumber}</CardTitle><p className="text-sm text-gray-600">{getTableNumber(order.tableId)}</p></div>
-                            {getStatusBadge(order.status)}
+              <div className="space-y-4">
+                {pendingOrders.map((order) => {
+                  const minutesWaiting = getWaitTimeMinutes(order.createdAt);
+                  const isOverdue = minutesWaiting > 15;
+                  return (
+                    <Card key={order.id} className={`border-2 ${getStatusColor(order.status)} ${isOverdue ? "ring-2 ring-red-500 animate-pulse" : ""}`}>
+                      <CardHeader>
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <CardTitle className="text-lg">{order.orderNumber}</CardTitle>
+                            <p className="text-sm text-gray-600">{getTableNumber(order.tableId)}</p>
                           </div>
-                          <div className="mt-1">
-                            <p className="text-xs text-gray-500">Tạo lúc: {format(new Date(order.createdAt), 'HH:mm')}</p>
-                            <p className="text-xs text-red-500 font-semibold">Đã chờ: {minutesWaiting} phút</p>
+                          {getStatusBadge(order.status)}
+                        </div>
+                        <div className="mt-1">
+                          <p className="text-xs text-gray-500">Tạo lúc: {format(new Date(order.createdAt), 'HH:mm')}</p>
+                          <p className="text-xs text-red-500 font-semibold">Đã chờ: {minutesWaiting} phút</p>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="space-y-3">
+                        {renderOrderItems(order.items)}
+                        {order.note && (
+                          <div className="bg-yellow-50 border border-yellow-200 p-3 rounded-xl">
+                            <p className="text-sm text-yellow-800">{order.note}</p>
                           </div>
-                        </CardHeader>
-                        <CardContent className="space-y-3">
-                          {renderOrderItems(order.items)}
-                          {order.note && <div className="bg-yellow-50 border border-yellow-200 p-3 rounded-xl"><p className="text-xs font-bold text-yellow-700 mb-1">Ghi chú</p><p className="text-sm text-yellow-800">{order.note}</p></div>}
-                          <Button className="w-full bg-blue-500 hover:bg-blue-600 text-white rounded-xl font-bold" onClick={() => updateOrderStatus(order.id, 'COOKING')}><ChefHat className="w-4 h-4 mr-2" /> Bắt đầu nấu</Button>
-                        </CardContent>
-                      </Card>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* CỘT 2: COOKING */}
-              <div>
-                <div className="flex items-center gap-2 mb-4">
-                  <ChefHat className="w-5 h-5 text-blue-600" />
-                  <h2 className="text-xl font-bold">Đang nấu ({cookingOrders.length})</h2>
-                </div>
-                <div className="space-y-4">
-                  {cookingOrders.map((order) => {
-                    const minutesWaiting = getWaitTimeMinutes(order.createdAt);
-                    return (
-                      <Card key={order.id} className={`border-2 ${getStatusColor(order.status)}`}>
-                        <CardHeader>
-                          <div className="flex items-center justify-between">
-                            <div><CardTitle className="text-lg">{order.orderNumber}</CardTitle><p className="text-sm text-gray-600">{getTableNumber(order.tableId)}</p></div>
-                            {getStatusBadge(order.status)}
-                          </div>
-                          <div className="mt-1"><p className="text-xs text-red-500 font-semibold">Tổng thời gian từ lúc đặt: {minutesWaiting} phút</p></div>
-                        </CardHeader>
-                        <CardContent className="space-y-3">
-                          {renderOrderItems(order.items)}
-                          <Button className="w-full bg-green-500 hover:bg-green-600 text-white rounded-xl font-bold" onClick={() => updateOrderStatus(order.id, 'DONE')}><CheckCircle className="w-4 h-4 mr-2" /> Hoàn thành món</Button>
-                        </CardContent>
-                      </Card>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* CỘT 3: DONE */}
-              <div>
-                <div className="mb-4">
-                  <div className="flex items-center gap-2"><CheckCircle className="w-5 h-5 text-green-600" /><h2 className="text-xl font-bold">Hoàn thành ({visibleDoneOrders.length})</h2></div>
-                </div>
-                <div className="space-y-4">
-                  {visibleDoneOrders.length === 0 ? (
-                    <div className="text-center py-10 border-2 border-dashed rounded-2xl text-gray-400 text-sm">Không có đơn hoàn thành gần đây</div>
-                  ) : (
-                    visibleDoneOrders.map((order) => (
-                      <Card key={order.id} className={`border ${getStatusColor(order.status)} opacity-75 shadow-sm`}>
-                        <CardHeader className="p-4 pb-2">
-                          <div className="flex items-center justify-between">
-                            <div><CardTitle className="text-md font-bold text-gray-700">{order.orderNumber}</CardTitle><p className="text-xs text-gray-600 font-medium">{getTableNumber(order.tableId)}</p></div>
-                            {getStatusBadge(order.status)}
-                          </div>
-                        </CardHeader>
-                        <CardContent className="p-4 pt-0 border-t border-gray-100/50 mt-2 bg-white/50 rounded-b-2xl">
-                          <div className="space-y-1 mt-2">
-                            {order.items.map((item: any, idx: number) => (
-                              <div key={idx} className="text-xs text-gray-600 flex justify-between"><span>• {item.quantity}x {item.productName}</span></div>
-                            ))}
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))
-                  )}
-                </div>
+                        )}
+                        <Button
+                          className="w-full bg-blue-500 hover:bg-blue-600 text-white"
+                          onClick={() => updateOrderStatus(order.id, 'COOKING')}
+                        >
+                          <ChefHat className="w-4 h-4 mr-2" /> Bắt đầu nấu
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
               </div>
             </div>
-          </>
+
+            {/* CỘT 2: COOKING */}
+            <div>
+              <div className="flex items-center gap-2 mb-4">
+                <ChefHat className="w-5 h-5 text-blue-600" />
+                <h2 className="text-xl font-bold">Đang nấu ({cookingOrders.length})</h2>
+              </div>
+              <div className="space-y-4">
+                {cookingOrders.map((order) => (
+                  <Card key={order.id} className={`border-2 ${getStatusColor(order.status)}`}>
+                    <CardHeader>
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <CardTitle className="text-lg">{order.orderNumber}</CardTitle>
+                          <p className="text-sm text-gray-600">{getTableNumber(order.tableId)}</p>
+                        </div>
+                        {getStatusBadge(order.status)}
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      {renderOrderItems(order.items)}
+                      <Button
+                        className="w-full bg-green-500 hover:bg-green-600 text-white"
+                        onClick={() => updateOrderStatus(order.id, 'DONE')}
+                      >
+                        <CheckCircle className="w-4 h-4 mr-2" /> Hoàn thành
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </div>
+
+            {/* CỘT 3: DONE */}
+            <div>
+              <div className="mb-4">
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="w-5 h-5 text-green-600" />
+                  <h2 className="text-xl font-bold">Hoàn thành ({visibleDoneOrders.length})</h2>
+                </div>
+              </div>
+              <div className="space-y-4">
+                {visibleDoneOrders.length === 0 ? (
+                  <div className="text-center py-10 border-2 border-dashed rounded-2xl text-gray-400 text-sm bg-white">
+                    Không có đơn hoàn thành gần đây
+                  </div>
+                ) : (
+                  visibleDoneOrders.map((order) => (
+                    <Card key={order.id} className={`border ${getStatusColor(order.status)} opacity-85 shadow-sm`}>
+                      <CardHeader className="p-4 pb-2">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <CardTitle className="text-md font-bold text-gray-700">{order.orderNumber}</CardTitle>
+                            <p className="text-xs text-gray-600">{getTableNumber(order.tableId)}</p>
+                          </div>
+                          {getStatusBadge(order.status)}
+                        </div>
+                      </CardHeader>
+                      <CardContent className="p-4 pt-0 bg-white rounded-b-2xl mt-2">
+                        <div className="space-y-1 pt-2">
+                          {order.items.map((item: any, idx: number) => (
+                            <div key={idx} className="text-xs text-gray-600 flex justify-between">
+                              <span className="font-semibold">• {item.quantity}x {item.productName}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
         )}
       </div>
 
-      {/* CONFIRM DIALOG RA CA (CHECK-OUT) */}
+      {/* DIALOG XÁC NHẬN XUỐNG CA / ĐÓNG PHIÊN */}
       <AlertDialog open={showConfirmCheckOut} onOpenChange={setShowConfirmCheckOut}>
         <AlertDialogContent className="rounded-2xl">
           <AlertDialogHeader>
-            <AlertDialogTitle>{isAdminOrOwner ? "Xác nhận đóng màn hình làm việc của bếp?" : "Xác nhận kết ca trực Bếp?"}</AlertDialogTitle>
+            <AlertDialogTitle>Xác nhận rời khỏi màn hình bếp?</AlertDialogTitle>
             <AlertDialogDescription>
               {isAdminOrOwner 
-                ? "Hành động này tạm dừng theo dõi phiên bếp của bạn. Bạn có thể mở lại bất cứ lúc nào."
-                : "Hành động này sẽ thực hiện ghi nhận thời gian rời ca (Check Out) của bộ phận Bếp và tạm dừng hiển thị các đơn hàng mới."}
+                ? "Bạn có chắc chắn muốn tạm thời đóng hoặc ẩn phiên làm việc của bếp không?" 
+                : "Hệ thống sẽ thực hiện Check Out (ghi nhận xuống ca trực) cho bạn. Bạn chắc chắn chứ?"
+              }
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel className="rounded-xl">Hủy</AlertDialogCancel>
-            <AlertDialogAction onClick={handleCheckOutConfirm} className="bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-bold">
-              Xác nhận
+            <AlertDialogAction onClick={handleCheckOutConfirm} className="bg-rose-600 hover:bg-rose-700 text-white rounded-xl">
+              Xác nhận đóng
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
